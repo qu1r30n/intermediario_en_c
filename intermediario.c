@@ -1,8 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "cabeceras/cabeceras_procesos/00_cabeceras_del_sistema/operaciones_textos.h"
-#include "cabeceras/cabeceras_procesos/00_cabeceras_del_sistema/var_fun_GG.h"
 
 #ifdef _WIN32
 #include <io.h>
@@ -10,48 +8,89 @@
 #include <unistd.h>
 #endif
 
+/* [0]=ID  [1]=archivo entrada  [2]=archivo salida */
+char *programas[][3] =
+{
+    {"SISTEMA_QU1R30N",  "conexion_arc/archivo_entrada.txt", "conexion_arc/archivo_salida.txt"},
+    {"NEXOPORTALARCANO", "conexion_arc/archivo_entrada.txt", "conexion_arc/archivo_salida.txt"},
+    {NULL, NULL, NULL}
+};
+
+#define SEPARADOR_TRANSFERENCIA "╬"
+
 /*
  * leer — Lee todas las lineas del archivo f.
- * Retorna un arreglo de strings (char**) terminado en NULL,
- * o NULL si el archivo esta vacio o falla la memoria.
- * El caller debe liberar cada string y el arreglo con free().
- * El parametro total_out recibe la cantidad de lineas leidas.
  */
 static char **leer(FILE *f, int *total_out)
 {
-    char **lineas = NULL; /* arreglo de lineas leidas        */
-    int total = 0;        /* cantidad de lineas acumuladas   */
-    int c;                /* caracter leido del archivo      */
-    char *s = NULL;       /* buffer de la linea actual       */
-    size_t n = 0;         /* longitud del buffer actual      */
+    char **lineas = NULL;
+    int total = 0;
+    int c;
+    char *s = NULL;
+    size_t n = 0;
 
     while ((c = fgetc(f)) != EOF)
     {
-        /* Agrandar el buffer para el caracter mas el terminador */
         char *t = (char *)realloc(s, n + 2);
-        if (t == NULL) { free(s); break; }
+
+        if (t == NULL)
+        {
+            free(s);
+            break;
+        }
+
         s = t;
         s[n++] = (char)c;
 
-        if (c == '\n') /* fin de linea: guardar y reiniciar buffer */
+        if (c == '\n')
         {
             s[n] = '\0';
-            char **tmp = (char **)realloc(lineas, (size_t)(total + 1) * sizeof(char *));
-            if (tmp == NULL) { free(s); break; }
+
+            char **tmp =
+                (char **)realloc(
+                    lineas,
+                    (size_t)(total + 1) * sizeof(char *));
+
+            if (tmp == NULL)
+            {
+                free(s);
+                break;
+            }
+
             lineas = tmp;
             lineas[total++] = s;
+
             s = NULL;
             n = 0;
         }
     }
-    free(s); /* descartar fragmento sin salto de linea al final */
+
+    if (s != NULL)
+    {
+        s[n] = '\0';
+
+        char **tmp =
+            (char **)realloc(
+                lineas,
+                (size_t)(total + 1) * sizeof(char *));
+
+        if (tmp != NULL)
+        {
+            lineas = tmp;
+            lineas[total++] = s;
+        }
+        else
+        {
+            free(s);
+        }
+    }
 
     *total_out = total;
-    return lineas; /* NULL si no se leyo ninguna linea */
+    return lineas;
 }
 
 /*
- * agregar — Escribe linea al final del archivo f.
+ * agregar — Escribe linea al final del archivo.
  */
 static void agregar(FILE *f, const char *linea)
 {
@@ -59,90 +98,152 @@ static void agregar(FILE *f, const char *linea)
 }
 
 /*
- * eliminar — Reescribe f conservando solo las lineas donde quitar[j] == 0.
- * Las lineas marcadas con quitar[j] == 1 quedan descartadas.
- * Trunca el archivo al nuevo tamano despues de reescribir.
+ * eliminar — Reescribe el archivo sin las lineas marcadas.
  */
 static void eliminar(FILE *f, char **lineas, int total, int *quitar)
 {
     long pos;
-    rewind(f); /* volver al inicio para sobreescribir */
+
+    rewind(f);
+
     for (int j = 0; j < total; j++)
     {
-        if (quitar[j] == 0) /* solo copiar las lineas no marcadas */
+        if (quitar[j] == 0)
+        {
             fputs(lineas[j], f);
+        }
     }
+
     fflush(f);
-    pos = ftell(f); /* posicion final = nuevo tamano del archivo */
+
+    pos = ftell(f);
+
     if (pos >= 0)
     {
 #ifdef _WIN32
-        _chsize_s(_fileno(f), (size_t)pos); /* truncar en Windows */
+        _chsize_s(_fileno(f), (size_t)pos);
 #else
-        ftruncate(fileno(f), pos);          /* truncar en POSIX   */
+        ftruncate(fileno(f), pos);
 #endif
     }
 }
 
+/*
+ * Obtiene el ID destino antes del separador.
+ * Ejemplo:
+ * SISTEMA_QU1R30N╬hola
+ * devuelve:
+ * SISTEMA_QU1R30N
+ */
+static int obtener_destinatario(
+    const char *linea,
+    char *destino,
+    size_t tam_destino)
+{
+    char *p;
+
+    if (linea == NULL || destino == NULL)
+    {
+        return 0;
+    }
+
+    p = strstr(linea, SEPARADOR_TRANSFERENCIA);
+
+    if (p == NULL)
+    {
+        return 0;
+    }
+
+    size_t len = (size_t)(p - linea);
+
+    if (len >= tam_destino)
+    {
+        len = tam_destino - 1;
+    }
+
+    memcpy(destino, linea, len);
+    destino[len] = '\0';
+
+    return 1;
+}
+
 int main(void)
 {
-    /* Tabla de programas: [nombre, archivo_entrada, archivo_salida, NULL] */
-    char *programas[][4] = {
-        {"SISTEMA_QU1R30N", "conexion_arc/archivo_entrada.txt", "conexion_arc/archivo_salida.txt", NULL},
-        {"NEXOPORTALARCANO", "conexion_arc/archivo_entrada.txt", "conexion_arc/archivo_salida.txt", NULL},
-        {"INTERMEDIARIO",   "conexion_arc/archivo_entrada.txt", "conexion_arc/archivo_salida.txt", NULL},
-        {NULL, NULL, NULL, NULL}
-    };
-
     for (int i = 0; programas[i][0] != NULL; i++)
     {
-        /* Abrir el archivo de salida en modo lectura/escritura */
         FILE *fs = fopen(programas[i][2], "r+");
-        if (fs == NULL) continue; /* saltar si no se puede abrir */
+
+        if (fs == NULL)
+        {
+            continue;
+        }
 
         int total = 0;
-        char **lineas = leer(fs, &total); /* leer todas las lineas */
-        if (lineas == NULL) { fclose(fs); continue; } /* archivo vacio o error */
 
-        int *quitar = (int *)calloc((size_t)total, sizeof(int));
-        if (quitar == NULL) { fclose(fs); return 1; }
+        char **lineas = leer(fs, &total);
 
-        /* Recorrer desde j=1 (j=0 es la cabecera del archivo) */
+        if (lineas == NULL)
+        {
+            fclose(fs);
+            continue;
+        }
+
+        int *quitar =
+            (int *)calloc((size_t)total, sizeof(int));
+
+        if (quitar == NULL)
+        {
+            fclose(fs);
+
+            for (int j = 0; j < total; j++)
+            {
+                free(lineas[j]);
+            }
+
+            free(lineas);
+
+            return 1;
+        }
+
         for (int j = 1; j < total; j++)
         {
-            char **partes = NULL;
-            /* Separar la linea por el caracter de transferencia para obtener el destinatario */
-            int n = split(lineas[j], GG_caracter_para_transferencia_entre_archivos[0], &partes);
+            char destinatario[256];
 
-            if (n > 0 && partes != NULL && partes[0] != NULL)
+            if (obtener_destinatario(
+                    lineas[j],
+                    destinatario,
+                    sizeof(destinatario)))
             {
-                /* Buscar a que programa pertenece esta linea */
                 for (int k = 0; programas[k][0] != NULL; k++)
                 {
-                    if (strcmp(partes[0], programas[k][0]) == 0)
+                    if (strcmp(destinatario, programas[k][0]) == 0)
                     {
-                        /* Abrir el archivo de entrada del programa destino y agregar la linea */
                         FILE *fe = fopen(programas[k][1], "a");
+
                         if (fe != NULL)
                         {
-                            agregar(fe, lineas[j]); /* escribir al destino */
+                            agregar(fe, lineas[j]);
+
                             fclose(fe);
-                            quitar[j] = 1; /* marcar para eliminar del origen */
+
+                            quitar[j] = 1;
                         }
+
                         break;
                     }
                 }
             }
-
-            if (partes != NULL) free_split(partes); /* liberar el split */
         }
 
-        /* Reescribir el archivo de salida sin las lineas transferidas */
         eliminar(fs, lineas, total, quitar);
+
         fclose(fs);
 
-        /* Liberar memoria de lineas y arreglo de marcas */
-        for (int j = 0; j < total; j++) free(lineas[j]);
+        for (int j = 0; j < total; j++)
+        {
+            free(lineas[j]);
+        }
+
         free(lineas);
         free(quitar);
     }
