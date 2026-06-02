@@ -11,9 +11,8 @@
 /* [0]=ID  [1]=archivo entrada  [2]=archivo salida */
 char *programas[][3] =
 {
-    {"SISTEMA_QU1R30N",  "conexion_arc/archivo_entrada.txt", "conexion_arc/archivo_salida.txt"},
-    {"NEXOPORTALARCANO", "conexion_arc/archivo_entrada.txt", "conexion_arc/archivo_salida.txt"},
-    {"INTERMEDIARIO",    "conexion_arc/archivo_entrada.txt", "conexion_arc/archivo_salida.txt"},
+    {"SISTEMA_QU1R30N",  "C:\\sys\\conexion_arc\\archivo_entrada.txt", "C:\\sys\\conexion_arc\\archivo_salida.txt"},
+    {"carcasa_punto_de_venta", "C:\\conexion_arc\\archivo_entrada.txt", "C:\\conexion_arc\\archivo_salida.txt"},
     {NULL, NULL, NULL}
 };
 
