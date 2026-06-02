@@ -13,13 +13,14 @@ char *programas[][3] =
 {
     {"SISTEMA_QU1R30N",  "conexion_arc/archivo_entrada.txt", "conexion_arc/archivo_salida.txt"},
     {"NEXOPORTALARCANO", "conexion_arc/archivo_entrada.txt", "conexion_arc/archivo_salida.txt"},
+    {"INTERMEDIARIO",    "conexion_arc/archivo_entrada.txt", "conexion_arc/archivo_salida.txt"},
     {NULL, NULL, NULL}
 };
 
-#define SEPARADOR_TRANSFERENCIA "╬"
+#define SEPARADOR_DESTINO "┴"
 
 /*
- * leer — Lee todas las lineas del archivo f.
+ * Lee todas las lineas del archivo.
  */
 static char **leer(FILE *f, int *total_out)
 {
@@ -90,7 +91,7 @@ static char **leer(FILE *f, int *total_out)
 }
 
 /*
- * agregar — Escribe linea al final del archivo.
+ * Agrega una linea al archivo.
  */
 static void agregar(FILE *f, const char *linea)
 {
@@ -98,7 +99,7 @@ static void agregar(FILE *f, const char *linea)
 }
 
 /*
- * eliminar — Reescribe el archivo sin las lineas marcadas.
+ * Elimina las lineas marcadas.
  */
 static void eliminar(FILE *f, char **lineas, int total, int *quitar)
 {
@@ -129,10 +130,12 @@ static void eliminar(FILE *f, char **lineas, int total, int *quitar)
 }
 
 /*
- * Obtiene el ID destino antes del separador.
+ * Obtiene el ID destino.
+ *
  * Ejemplo:
- * SISTEMA_QU1R30N╬hola
- * devuelve:
+ * SISTEMA_QU1R30N┴NEXOPORTALARCANO■COMANDO■DATOS
+ *
+ * Resultado:
  * SISTEMA_QU1R30N
  */
 static int obtener_destinatario(
@@ -147,7 +150,7 @@ static int obtener_destinatario(
         return 0;
     }
 
-    p = strstr(linea, SEPARADOR_TRANSFERENCIA);
+    p = strstr(linea, SEPARADOR_DESTINO);
 
     if (p == NULL)
     {
