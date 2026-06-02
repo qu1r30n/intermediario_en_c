@@ -8,19 +8,82 @@
 #include <unistd.h>
 #endif
 
-/* [0]=ID  [1]=archivo entrada  [2]=archivo salida */
+/* =========================================================
+   CONFIGURACION DE PROGRAMAS
+   [0] = ID
+   [1] = ARCHIVO_ENTRADA
+   [2] = ARCHIVO_SALIDA
+   ========================================================= */
+
 char *programas[][3] =
 {
-    {"SISTEMA_QU1R30N",  "C:\\sys\\conexion_arc\\archivo_entrada.txt", "C:\\sys\\conexion_arc\\archivo_salida.txt"},
-    {"carcasa_punto_de_venta", "C:\\conexion_arc\\archivo_entrada.txt", "C:\\conexion_arc\\archivo_salida.txt"},
+    {"SISTEMA_QU1R30N",       "conexion_arc/archivo_entrada.txt",     "conexion_arc/archivo_salida.txt"},
+    {"carcasa_punto_de_venta","C:/conexion_arc/archivo_entrada.txt",  "C:/conexion_arc/archivo_salida.txt"},
     {NULL, NULL, NULL}
 };
 
-#define SEPARADOR_DESTINO "┴"
+/* =========================================================
+   SEPARADORES DEL PROTOCOLO
 
-/*
- * Lee todas las lineas del archivo.
- */
+   FORMATO:
+
+   ID_DESTINO┴ID_ORIGEN■COMANDO■DATOS
+   ========================================================= */
+
+#define SEPARADOR_DESTINO "┴"
+#define SEPARADOR_CAMPO   "■"
+
+/* =========================================================
+   REGISTRAR ERROR
+   ========================================================= */
+
+static void registrar_error(
+    const char *archivo,
+    const char *id_esperado,
+    const char *id_recibido,
+    const char *linea)
+{
+    FILE *f = fopen("errores.txt", "a");
+
+    if (f == NULL)
+    {
+        return;
+    }
+
+    time_t ahora = time(NULL);
+    struct tm *fecha = localtime(&ahora);
+
+    char fecha_texto[64];
+
+    strftime(
+        fecha_texto,
+        sizeof(fecha_texto),
+        "%Y-%m-%d %H:%M:%S",
+        fecha);
+
+    fprintf(
+        f,
+        "\n====================================================\n"
+        "ERROR DE IDENTIDAD DETECTADO\n"
+        "FECHA: %s\n"
+        "ARCHIVO: %s\n"
+        "ID ESPERADO: %s\n"
+        "ID RECIBIDO: %s\n"
+        "MENSAJE: %s\n"
+        "====================================================\n",
+        fecha_texto,
+        archivo,
+        id_esperado,
+        id_recibido,
+        linea
+    );
+
+    fclose(f);
+}
+/* =========================================================
+   LEER TODAS LAS LINEAS
+   ========================================================= */
+
 static char **leer(FILE *f, int *total_out)
 {
     char **lineas = NULL;
@@ -86,20 +149,23 @@ static char **leer(FILE *f, int *total_out)
     }
 
     *total_out = total;
+
     return lineas;
 }
 
-/*
- * Agrega una linea al archivo.
- */
+/* =========================================================
+   AGREGAR LINEA
+   ========================================================= */
+
 static void agregar(FILE *f, const char *linea)
 {
     fputs(linea, f);
 }
 
-/*
- * Elimina las lineas marcadas.
- */
+/* =========================================================
+   ELIMINAR LINEAS MARCADAS
+   ========================================================= */
+
 static void eliminar(FILE *f, char **lineas, int total, int *quitar)
 {
     long pos;
@@ -128,19 +194,17 @@ static void eliminar(FILE *f, char **lineas, int total, int *quitar)
     }
 }
 
-/*
- * Obtiene el ID destino.
- *
- * Ejemplo:
- * SISTEMA_QU1R30N┴NEXOPORTALARCANO■COMANDO■DATOS
- *
- * Resultado:
- * SISTEMA_QU1R30N
- */
-static int obtener_destinatario(
+/* =========================================================
+   OBTENER DESTINO
+
+   DESTINO┴ORIGEN■COMANDO■DATOS
+   ^^^^^^^
+   ========================================================= */
+
+static int obtener_destino(
     const char *linea,
     char *destino,
-    size_t tam_destino)
+    size_t tam)
 {
     char *p;
 
@@ -158,16 +222,72 @@ static int obtener_destinatario(
 
     size_t len = (size_t)(p - linea);
 
-    if (len >= tam_destino)
+    if (len >= tam)
     {
-        len = tam_destino - 1;
+        len = tam - 1;
     }
 
     memcpy(destino, linea, len);
+
     destino[len] = '\0';
 
     return 1;
 }
+
+/* =========================================================
+   OBTENER ORIGEN
+
+   DESTINO┴ORIGEN■COMANDO■DATOS
+            ^^^^^^
+   ========================================================= */
+
+static int obtener_origen(
+    const char *linea,
+    char *origen,
+    size_t tam)
+{
+    char *p1;
+    char *p2;
+    size_t len;
+
+    if (linea == NULL || origen == NULL)
+    {
+        return 0;
+    }
+
+    p1 = strstr(linea, SEPARADOR_DESTINO);
+
+    if (p1 == NULL)
+    {
+        return 0;
+    }
+
+    p1 += strlen(SEPARADOR_DESTINO);
+
+    p2 = strstr(p1, SEPARADOR_CAMPO);
+
+    if (p2 == NULL)
+    {
+        return 0;
+    }
+
+    len = (size_t)(p2 - p1);
+
+    if (len >= tam)
+    {
+        len = tam - 1;
+    }
+
+    memcpy(origen, p1, len);
+
+    origen[len] = '\0';
+
+    return 1;
+}
+
+/* =========================================================
+   MAIN
+   ========================================================= */
 
 int main(void)
 {
@@ -209,35 +329,72 @@ int main(void)
 
         for (int j = 1; j < total; j++)
         {
-            char destinatario[256];
+            char destino[256];
+            char origen[256];
 
-            if (obtener_destinatario(
+            if (!obtener_destino(
                     lineas[j],
-                    destinatario,
-                    sizeof(destinatario)))
+                    destino,
+                    sizeof(destino)))
             {
-                for (int k = 0; programas[k][0] != NULL; k++)
+                continue;
+            }
+
+            if (!obtener_origen(
+                    lineas[j],
+                    origen,
+                    sizeof(origen)))
+            {
+                continue;
+            }
+
+            /*
+             * VALIDACION DE IDENTIDAD
+             *
+             * El ID_ORIGEN declarado en el mensaje
+             * debe coincidir con el dueño real
+             * del archivo de salida.
+             */
+
+            if (strcmp(origen, programas[i][0]) != 0)
+            {
+                registrar_error(
+                    programas[i][2],
+                    programas[i][0],
+                    origen,
+                    lineas[j]);
+
+                quitar[j] = 1;
+
+                continue;
+            }
+
+            for (int k = 0; programas[k][0] != NULL; k++)
+            {
+                if (strcmp(destino, programas[k][0]) == 0)
                 {
-                    if (strcmp(destinatario, programas[k][0]) == 0)
+                    FILE *fe =
+                        fopen(programas[k][1], "a");
+
+                    if (fe != NULL)
                     {
-                        FILE *fe = fopen(programas[k][1], "a");
+                        agregar(fe, lineas[j]);
 
-                        if (fe != NULL)
-                        {
-                            agregar(fe, lineas[j]);
+                        fclose(fe);
 
-                            fclose(fe);
-
-                            quitar[j] = 1;
-                        }
-
-                        break;
+                        quitar[j] = 1;
                     }
+
+                    break;
                 }
             }
         }
 
-        eliminar(fs, lineas, total, quitar);
+        eliminar(
+            fs,
+            lineas,
+            total,
+            quitar);
 
         fclose(fs);
 
