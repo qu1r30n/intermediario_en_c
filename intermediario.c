@@ -1,12 +1,24 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #ifdef _WIN32
+#include <windows.h>
 #include <io.h>
 #else
 #include <unistd.h>
 #endif
+
+void esperar_segundos(int seg)
+{
+#ifdef _WIN32
+    Sleep(seg*1000);      /* milisegundos */
+#else
+    sleep(seg);         /* segundos */
+#endif
+}
+
 
 /* =========================================================
    CONFIGURACION DE PROGRAMAS
@@ -291,8 +303,11 @@ static int obtener_origen(
 
 int main(void)
 {
-    for (int i = 0; programas[i][0] != NULL; i++)
-    {
+	while(1==1)
+	{
+	
+    	for (int i = 0; programas[i][0] != NULL; i++)
+    	{
         FILE *fs = fopen(programas[i][2], "r+");
 
         if (fs == NULL)
@@ -405,7 +420,9 @@ int main(void)
 
         free(lineas);
         free(quitar);
-    }
+    	}
 
+	esperar_segundos(3);
+	}
     return 0;
 }
