@@ -29,8 +29,8 @@ void esperar_segundos(int seg)
 
 char *programas[][3] =
 {
-    {"SISTEMA_QU1R30N",       "conexion_arc/archivo_entrada.txt",     "conexion_arc/archivo_salida.txt"},
-    {"carcasa_punto_de_venta","C:/conexion_arc/archivo_entrada.txt",  "C:/conexion_arc/archivo_salida.txt"},
+    {"SISTEMA_QU1R30N",       "C:/sys/archivo_entrada_sys.txt",     "C:/sys/archivo_salida_sys.txt"},
+    {"carcasa_punto_de_venta","C:/sys/archivo_entrada_carcasa.txt",  "C:/sys/archivo_salida_carcasa.txt"},
     {NULL, NULL, NULL}
 };
 
@@ -92,6 +92,7 @@ static void registrar_error(
 
     fclose(f);
 }
+
 /* =========================================================
    LEER TODAS LAS LINEAS
    ========================================================= */
@@ -303,124 +304,90 @@ static int obtener_origen(
 
 int main(void)
 {
-	while(1==1)
+	while(1)
 	{
 	
     	for (int i = 0; programas[i][0] != NULL; i++)
     	{
-        FILE *fs = fopen(programas[i][2], "r+");
-
-        if (fs == NULL)
-        {
-            continue;
-        }
-
-        int total = 0;
-
-        char **lineas = leer(fs, &total);
-
-        if (lineas == NULL)
-        {
-            fclose(fs);
-            continue;
-        }
-
-        int *quitar =
-            (int *)calloc((size_t)total, sizeof(int));
-
-        if (quitar == NULL)
-        {
-            fclose(fs);
-
-            for (int j = 0; j < total; j++)
-            {
-                free(lineas[j]);
-            }
-
-            free(lineas);
-
-            return 1;
-        }
-
-        for (int j = 1; j < total; j++)
-        {
-            char destino[256];
-            char origen[256];
-
-            if (!obtener_destino(
-                    lineas[j],
-                    destino,
-                    sizeof(destino)))
-            {
-                continue;
-            }
-
-            if (!obtener_origen(
-                    lineas[j],
-                    origen,
-                    sizeof(origen)))
-            {
-                continue;
-            }
-
-            /*
-             * VALIDACION DE IDENTIDAD
-             *
-             * El ID_ORIGEN declarado en el mensaje
-             * debe coincidir con el dueño real
-             * del archivo de salida.
-             */
-
-            if (strcmp(origen, programas[i][0]) != 0)
-            {
-                registrar_error(
-                    programas[i][2],
-                    programas[i][0],
-                    origen,
-                    lineas[j]);
-
-                quitar[j] = 1;
-
-                continue;
-            }
-
-            for (int k = 0; programas[k][0] != NULL; k++)
-            {
-                if (strcmp(destino, programas[k][0]) == 0)
-                {
-                    FILE *fe =
-                        fopen(programas[k][1], "a");
-
-                    if (fe != NULL)
-                    {
-                        agregar(fe, lineas[j]);
-
-                        fclose(fe);
-
-                        quitar[j] = 1;
-                    }
-
-                    break;
-                }
-            }
-        }
-
-        eliminar(
-            fs,
-            lineas,
-            total,
-            quitar);
-
-        fclose(fs);
-
-        for (int j = 0; j < total; j++)
-        {
-            free(lineas[j]);
-        }
-
-        free(lineas);
-        free(quitar);
+	    	printf("--Programa[%d][2]: %s\n",i, programas[i][2]);	
+	        FILE *fs = fopen(programas[i][2], "r+");
+	
+	        if (fs == NULL){continue;}
+	
+	        int total = 0;
+	
+	        char **lineas = leer(fs, &total);
+	
+	        if (lineas == NULL){fclose(fs);continue;}
+	
+	        int *quitar =(int *)calloc((size_t)total, sizeof(int));
+	
+	        if (quitar == NULL){fclose(fs);for (int j = 0; j < total; j++){free(lineas[j]);}free(lineas);return 1;}
+	
+	        for (int j = 1; j < total; j++)
+	        {
+	            char destino[256];
+	            char origen[256];
+	            
+	            
+	            if (!obtener_destino(lineas[j],destino,sizeof(destino))){continue;}
+	            printf("--Programa: %s\n", destino);
+	            if (!obtener_origen(lineas[j],origen,sizeof(origen))){continue;}
+	            printf("--Programa: %s\n", origen);
+	            
+	            /*
+	             * VALIDACION DE IDENTIDAD
+	             *
+	             * El ID_ORIGEN declarado en el mensaje
+	             * debe coincidir con el dueño real
+	             * del archivo de salida.
+	             */
+	
+	            if (strcmp(origen, programas[i][0]) != 0)
+	            {
+	            
+	                registrar_error(programas[i][2],programas[i][0],origen,lineas[j]);quitar[j] = 1;continue;
+	            }
+	
+	            for (int k = 0; programas[k][0] != NULL; k++)
+	            {
+	            	printf("--Programa: %s|%s\n", destino,programas[k][0]);
+	            
+	                if (strcmp(destino, programas[k][0]) == 0)
+	                {
+	                    FILE *fe =fopen(programas[k][1], "a");
+	
+	                    if (fe != NULL)
+	                    {
+	                        agregar(fe, lineas[j]);
+	
+	                        fclose(fe);
+	
+	                        quitar[j] = 1;
+	                    }
+	
+	                    break;
+	                }
+	            }
+	        }
+			printf("--lineas: %s\n", lineas);	
+	        eliminar(fs,lineas,total,quitar);
+	
+	        fclose(fs);
+	
+	        for (int j = 0; j < total; j++)
+	        {
+	        	printf("--lineas[j]: %s\n", lineas[j]);	
+	            free(lineas[j]);
+	        }
+	
+	        free(lineas);
+	        free(quitar);
     	}
+
+
+
+
 
 	esperar_segundos(3);
 	}
